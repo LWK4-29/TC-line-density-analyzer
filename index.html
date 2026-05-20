@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>試紙T/C line數值分析系統 | Professional Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/opencv.js@1.2.1/opencv.js" async id="opencv-js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.11.0/dist/pptxgen.bundle.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Noto+Sans+TC:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent-t1: #ef4444;
+            --accent-t2: #fbbf24;
+            --accent-c: #3b82f6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', 'Noto Sans TC', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+
+        header {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 1rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 1.5rem auto;
+            padding: 0 1rem;
+        }
+
+        .upload-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 2.5rem;
+            text-align: center;
+            border: 2px dashed var(--border);
+            cursor: pointer;
+            transition: 0.3s;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .upload-card.drag-over {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+            transform: scale(1.02);
+        }
+
+        .upload-card:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            align-items: center;
+        }
+
+        .config-bar {
+            display: flex;
+            gap: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.6rem 1.8rem;
+            border-radius: 50px;
+            border: 1px solid var(--border);
+            margin-bottom: 5px;
+        }
+
+        .config-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 0.6rem 1.1rem;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        .btn-success {
+            background: var(--accent-c);
+            color: white;
+        }
+
+        .btn-sync {
+            background: #10b981;
+            color: white;
+        }
+
+        .strip-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .strip-item {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 0.6rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            border: 1px solid var(--border);
+        }
+
+        .strip-id {
+            width: 30px;
+            font-weight: 800;
+            color: var(--primary);
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .canvas-container {
+            flex: 1;
+            min-width: 0;
+            position: relative;
+            background: #000;
+            border-radius: 4px;
+            overflow: hidden;
+            max-height: 90px;
+            touch-action: none;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            cursor: crosshair;
+        }
+
+        .mini-table {
+            width: 180px;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            flex-shrink: 0;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .mini-table th {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 3px;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.7rem;
+        }
+
+        .mini-table td {
+            padding: 4px;
+            border: 1px solid var(--border);
+            text-align: center;
+            font-weight: 700;
+            font-family: 'Outfit';
+            font-size: 1rem;
+        }
+
+        .summary-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 1.2rem;
+            border: 1px solid var(--border);
+            margin-top: 2rem;
+        }
+
+        .excel-table {
+            width: auto;
+            min-width: 300px;
+            border-collapse: collapse;
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 0 auto;
+        }
+
+        .excel-table th {
+            background: #2e3b4e;
+            color: var(--text-muted);
+            padding: 5px 10px;
+            font-size: 0.75rem;
+            border: 1px solid var(--border);
+        }
+
+        .excel-table td {
+            border: 1px solid var(--border);
+            padding: 4px 6px;
+            text-align: center;
+            font-size: 0.9rem;
+            font-weight: 600;
+            background: #ffffff05;
+            min-width: 45px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>試紙T/C line數值分析系統</h1>
+    </header>
+
+    <div class="container">
+        <div class="upload-card" id="uploadArea">
+            <span style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">📸</span>
+            <p style="font-weight: 600; font-size: 1rem;">上傳或拖曳試紙照片至此</p>
+            <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 5px;">支援雙排試紙自動排序判讀</p>
+            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+        </div>
+
+        <div class="controls hidden" id="mainControls">
+            <div class="config-bar">
+                <label class="config-item"><input type="checkbox" id="checkT1" checked onchange="renderStrips()"> T1
+                    (紅)</label>
+                <label class="config-item"><input type="checkbox" id="checkT2" onchange="renderStrips()"> T2 (黃)</label>
+                <label class="config-item"><input type="checkbox" id="checkC" checked onchange="renderStrips()"> C
+                    (藍)</label>
+                <span style="border-left: 1px solid var(--border); margin: 0 10px; height: 1.5rem;"></span>
+                <label class="config-item"><input type="checkbox" id="lockWidth" checked> 🔒 鎖定框距</label>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-sync" onclick="syncAllRois()">🔗 同步第一張框位</button>
+                <button class="btn btn-primary" onclick="runAnalysis()">⚡ 一鍵判讀數值</button>
+                <button class="btn btn-secondary" onclick="exportExcel()">📊 匯出 Excel</button>
+                <button class="btn btn-success" onclick="exportPPT()">🖼️ 下載報告 (PPT)</button>
+            </div>
+        </div>
+
+        <div id="loadingArea" style="text-align:center; padding: 1rem;" class="hidden">
+            <p>處理中...</p>
+        </div>
+        <div class="strip-list" id="stripList"></div>
+
+        <div id="summarySection" class="summary-card hidden">
+            <div style="margin-bottom: 12px; text-align: center;"><span
+                    style="font-weight: 600; color: var(--primary); font-size: 0.9rem;">📊 T&C line density 數據表</span>
+            </div>
+            <div style="overflow-x: auto; display: flex; justify-content: center;">
+                <table class="excel-table" id="summaryTable">
+                    <thead id="summaryHead"></thead>
+                    <tbody id="summaryBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let strips = [];
+        let isDragging = false, activeStripIdx = null, activeRoiIdx = null, dragSide = 'left', dragStartX = 0;
+        let isCvReady = false;
+        let analysisRun = false;
+
+        if (typeof cv !== 'undefined') { isCvReady = true; }
+        else { document.getElementById('opencv-js').onload = () => { isCvReady = true; }; }
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const stripList = document.getElementById('stripList');
+        const mainControls = document.getElementById('mainControls');
+        const summarySection = document.getElementById('summarySection');
+
+        uploadArea.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => handleFiles(e.target.files);
+        uploadArea.ondragover = (e) => { e.preventDefault(); uploadArea.classList.add('drag-over'); };
+        uploadArea.ondragleave = () => { uploadArea.classList.remove('drag-over'); };
+        uploadArea.ondrop = (e) => { e.preventDefault(); uploadArea.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); };
+
+        function handleFiles(files) { if (files[0] && isCvReady) processImage(files[0]); }
+
+        async function processImage(file) {
+            document.getElementById('loadingArea').classList.remove('hidden');
+            mainControls.classList.add('hidden');
+            summarySection.classList.add('hidden');
+            stripList.innerHTML = ''; strips = []; analysisRun = false;
+
+            const img = await loadImage(URL.createObjectURL(file));
+            const dScale = 1600 / Math.max(img.width, img.height);
+            const dCanvas = document.createElement('canvas');
+            dCanvas.width = img.width * dScale; dCanvas.height = img.height * dScale;
+            dCanvas.getContext('2d').drawImage(img, 0, 0, dCanvas.width, dCanvas.height);
+
+            setTimeout(() => {
+                let src = cv.imread(dCanvas);
+                let gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                let blurred = new cv.Mat(); cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+                let thresh = new cv.Mat(); cv.threshold(blurred, thresh, 100, 255, cv.THRESH_BINARY);
+                let edge = new cv.Mat(); cv.Canny(thresh, edge, 80, 170);
+                let contours = new cv.MatVector(), hierarchy = new cv.Mat();
+                cv.findContours(edge, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+                let boxes = [];
+                for (let i = 0; i < contours.size(); ++i) {
+                    let rect = cv.boundingRect(contours.get(i));
+                    // 放寬長寬比和最小寬度的限制，以容納裁切不完美或較短的試紙 (如圖中的 7, 8)
+                    if (rect.width > 80 && rect.height > 15 && (rect.width / rect.height) > 2.5) boxes.push(rect);
+                }
+
+                // 1. 初步按 Y 軸中心排序以便進行合併，使用中心點比較穩定
+                boxes.sort((a, b) => (a.y + a.height / 2) - (b.y + b.height / 2));
+
+                // 2. 局部合併邏輯：增加水平距離檢查，防止跨排誤合
+                let merged = [];
+                if (boxes.length > 0) {
+                    let cur = boxes[0];
+                    for (let i = 1; i < boxes.length; i++) {
+                        // 使用 Y 軸中心點距離來判斷是否為同一水平線上的碎片，容忍度設為高度的 70%
+                        let yCenterDiff = Math.abs((boxes[i].y + boxes[i].height / 2) - (cur.y + cur.height / 2));
+                        // X 軸距離也放寬一點，只要有重疊或靠得很近就合併
+                        let xProximity = Math.abs(boxes[i].x - cur.x) < cur.width * 0.5 ||
+                            (boxes[i].x >= cur.x && boxes[i].x <= cur.x + cur.width);
+
+                        if (yCenterDiff < cur.height * 0.7 && xProximity) {
+                            let xMin = Math.min(cur.x, boxes[i].x), yMin = Math.min(cur.y, boxes[i].y);
+                            let xMax = Math.max(cur.x + cur.width, boxes[i].x + boxes[i].width), yMax = Math.max(cur.y + cur.height, boxes[i].y + boxes[i].height);
+                            cur = { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin };
+                        } else { merged.push(cur); cur = boxes[i]; }
+                    }
+                    merged.push(cur);
+                }
+
+                // 3. 雙排排序邏輯 (左排由上至下，再右排由上至下)
+                let columns = [];
+                if (merged.length > 0) {
+                    // 先按水平位置(X軸中心)排序，找出可能的排隊間隙
+                    merged.sort((a, b) => (a.x + a.width / 2) - (b.x + b.width / 2));
+                    let divider = -1;
+                    for (let i = 0; i < merged.length - 1; i++) {
+                        let gap = (merged[i + 1].x + merged[i + 1].width / 2) - (merged[i].x + merged[i].width / 2);
+                        // 如果兩根試紙中心間距超過平均寬度的 70%，視為不同排
+                        if (gap > merged[i].width * 0.7) {
+                            divider = (merged[i + 1].x + merged[i + 1].width / 2 + merged[i].x + merged[i].width / 2) / 2;
+                            break;
+                        }
+                    }
+
+                    if (divider !== -1) {
+                        let leftCol = merged.filter(b => (b.x + b.width / 2) < divider).sort((a, b) => a.y - b.y);
+                        let rightCol = merged.filter(b => (b.x + b.width / 2) >= divider).sort((a, b) => a.y - b.y);
+                        if (leftCol.length > 0) columns.push(leftCol);
+                        if (rightCol.length > 0) columns.push(rightCol);
+                    } else {
+                        merged.sort((a, b) => a.y - b.y);
+                        columns.push(merged);
+                    }
+                }
+
+                let finalBoxes = [];
+                columns.forEach(col => {
+                    if (col.length === 0) return;
+                    // 計算該排試紙的 X, Width, Height 中位數
+                    let sortedX = col.map(b => b.x).sort((a, b) => a - b);
+                    let sortedW = col.map(b => b.width).sort((a, b) => a - b);
+                    let sortedH = col.map(b => b.height).sort((a, b) => a - b);
+                    let medX = sortedX[Math.floor(sortedX.length / 2)];
+                    let medW = sortedW[Math.floor(sortedW.length / 2)];
+                    let medH = sortedH[Math.floor(sortedH.length / 2)];
+
+                    col.forEach(box => {
+                        // 排除雜訊：如果寬度或高度小於中位數的 50%，視為雜訊 (例如便條紙上的文字)
+                        if (box.height < medH * 0.5 || box.width < medW * 0.5) return;
+
+                        // 強制使用該排的中位數 X 坐標與寬高度，確保每一張裁切出來的畫面完全一致
+                        // 即使部分試紙被便條紙遮擋 (如 7, 8)，也能依照其中間點完美還原正確的裁切範圍
+                        let cy = box.y + box.height / 2;
+                        finalBoxes.push({
+                            x: medX,
+                            y: cy - medH / 2,
+                            width: medW,
+                            height: medH
+                        });
+                    });
+                });
+
+                finalBoxes.forEach((box, idx) => {
+                    const sCanvas = document.createElement('canvas');
+                    sCanvas.width = box.width / dScale; sCanvas.height = box.height / dScale;
+                    sCanvas.getContext('2d').drawImage(img, box.x / dScale, box.y / dScale, box.width / dScale, box.height / dScale, 0, 0, sCanvas.width, sCanvas.height);
+                    strips.push({
+                        id: idx + 1, canvas: sCanvas, rois: [
+                            { label: 'T1', x: 0.15, w: 0.08, val: 0, color: '#ef4444' },
+                            { label: 'T2', x: 0.35, w: 0.08, val: 0, color: '#fbbf24' },
+                            { label: 'C', x: 0.55, w: 0.08, val: 0, color: '#3b82f6' }
+                        ]
+                    });
+                });
+
+                document.getElementById('loadingArea').classList.add('hidden');
+                mainControls.classList.remove('hidden'); renderStrips();
+                src.delete(); gray.delete(); blurred.delete(); thresh.delete(); edge.delete(); contours.delete(); hierarchy.delete();
+            }, 50);
+        }
+
+        function renderStrips() {
+            stripList.innerHTML = '';
+            const useT1 = document.getElementById('checkT1').checked, useT2 = document.getElementById('checkT2').checked, useC = document.getElementById('checkC').checked;
+            strips.forEach((s, idx) => {
+                const item = document.createElement('div');
+                item.className = 'strip-item';
+                item.innerHTML = `<div class="strip-id">${s.id}</div><div class="canvas-container"><canvas id="canvas-${idx}"></canvas></div>
+                <table class="mini-table"><thead><tr>${useT1 ? '<th>T1</th>' : ''}${useT2 ? '<th>T2</th>' : ''}${useC ? '<th>C</th>' : ''}</tr></thead>
+                <tbody><tr>${useT1 ? `<td id="val-${idx}-T1" style="color:${s.rois[0].color}">--</td>` : ''}${useT2 ? `<td id="val-${idx}-T2" style="color:${s.rois[1].color}">--</td>` : ''}${useC ? `<td id="val-${idx}-C" style="color:${s.rois[2].color}">--</td>` : ''}</tr></tbody></table>`;
+                stripList.appendChild(item); drawStrip(idx); attachEvents(document.getElementById(`canvas-${idx}`), idx);
+            });
+        }
+
+        function drawStrip(sIdx) {
+            const s = strips[sIdx], canvas = document.getElementById(`canvas-${sIdx}`); if (!canvas) return;
+            canvas.width = s.canvas.width; canvas.height = s.canvas.height;
+            const ctx = canvas.getContext('2d'); ctx.drawImage(s.canvas, 0, 0);
+            const useT1 = document.getElementById('checkT1').checked, useT2 = document.getElementById('checkT2').checked, useC = document.getElementById('checkC').checked;
+            s.rois.forEach((roi, idx) => {
+                if ((idx === 0 && !useT1) || (idx === 1 && !useT2) || (idx === 2 && !useC)) return;
+                const x1 = roi.x * canvas.width, x2 = (roi.x + roi.w) * canvas.width;
+                ctx.strokeStyle = roi.color; ctx.lineWidth = Math.max(1, canvas.height / 30);
+                ctx.beginPath(); ctx.moveTo(x1, 0); ctx.lineTo(x1, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(x2, 0); ctx.lineTo(x2, canvas.height); ctx.stroke();
+                ctx.fillStyle = roi.color; ctx.font = `bold ${Math.max(8, canvas.height / 5)}px Outfit`;
+                const lText = roi.label + "L", rText = roi.label + "R";
+                ctx.fillText(lText, x1 - ctx.measureText(lText).width - 2, canvas.height - 2);
+                ctx.fillText(rText, x2 + 2, canvas.height - 2);
+            });
+        }
+
+        function attachEvents(canvas, sIdx) {
+            canvas.onmousemove = (e) => {
+                if (isDragging) return;
+                const rect = canvas.getBoundingClientRect(); const mouseX = (e.clientX - rect.left) / rect.width;
+                let cursor = 'crosshair';
+                const useT1 = document.getElementById('checkT1').checked, useT2 = document.getElementById('checkT2').checked, useC = document.getElementById('checkC').checked;
+                const lockWidth = document.getElementById('lockWidth').checked;
+
+                strips[sIdx].rois.forEach((roi, rIdx) => {
+                    if ((rIdx === 0 && !useT1) || (rIdx === 1 && !useT2) || (rIdx === 2 && !useC)) return;
+
+                    if (lockWidth) {
+                        if (mouseX > roi.x - 0.02 && mouseX < roi.x + roi.w + 0.02) cursor = 'move';
+                    } else {
+                        const fw = 0.02; // 邊緣判定範圍
+                        if (Math.abs(mouseX - roi.x) < fw || Math.abs(mouseX - (roi.x + roi.w)) < fw) cursor = 'col-resize';
+                        else if (mouseX > roi.x && mouseX < roi.x + roi.w) cursor = 'move';
+                    }
+                });
+                canvas.style.cursor = cursor;
+            };
+
+            canvas.onmousedown = (e) => {
+                const rect = canvas.getBoundingClientRect(); const mouseX = (e.clientX - rect.left) / rect.width;
+                const useT1 = document.getElementById('checkT1').checked, useT2 = document.getElementById('checkT2').checked, useC = document.getElementById('checkC').checked;
+                const lockWidth = document.getElementById('lockWidth').checked;
+
+                strips[sIdx].rois.forEach((roi, rIdx) => {
+                    if ((rIdx === 0 && !useT1) || (rIdx === 1 && !useT2) || (rIdx === 2 && !useC)) return;
+
+                    if (lockWidth) {
+                        if (mouseX > roi.x - 0.02 && mouseX < roi.x + roi.w + 0.02) {
+                            isDragging = true; activeStripIdx = sIdx; activeRoiIdx = rIdx; dragSide = 'center'; dragStartX = mouseX - roi.x;
+                        }
+                    } else {
+                        const fw = 0.04; // 點擊判定範圍
+                        if (Math.abs(mouseX - roi.x) < fw) { isDragging = true; activeStripIdx = sIdx; activeRoiIdx = rIdx; dragSide = 'left'; }
+                        else if (Math.abs(mouseX - (roi.x + roi.w)) < fw) { isDragging = true; activeStripIdx = sIdx; activeRoiIdx = rIdx; dragSide = 'right'; }
+                        else if (mouseX > roi.x && mouseX < roi.x + roi.w) {
+                            isDragging = true; activeStripIdx = sIdx; activeRoiIdx = rIdx; dragSide = 'center'; dragStartX = mouseX - roi.x;
+                        }
+                    }
+                });
+            };
+        }
+
+        window.onmousemove = (e) => {
+            if (!isDragging) return;
+            const canvas = document.getElementById(`canvas-${activeStripIdx}`); if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+            let mx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            const roi = strips[activeStripIdx].rois[activeRoiIdx];
+
+            if (dragSide === 'left') {
+                const oldR = roi.x + roi.w;
+                roi.x = Math.min(oldR - 0.01, mx);
+                roi.w = oldR - roi.x;
+            } else if (dragSide === 'right') {
+                roi.w = Math.max(0.01, mx - roi.x);
+            } else if (dragSide === 'center') {
+                let newX = mx - dragStartX;
+                newX = Math.max(0, Math.min(1 - roi.w, newX)); // 確保不超出邊界
+                roi.x = newX;
+            }
+            drawStrip(activeStripIdx);
+        };
+        window.onmouseup = () => isDragging = false;
+
+        function syncAllRois() { const first = JSON.parse(JSON.stringify(strips[0].rois)); strips.forEach((s, i) => { if (i !== 0) { s.rois = JSON.parse(JSON.stringify(first)); drawStrip(i); } }); }
+
+        function runAnalysis() {
+            const useT1 = document.getElementById('checkT1').checked, useT2 = document.getElementById('checkT2').checked, useC = document.getElementById('checkC').checked;
+            const head = document.getElementById('summaryHead'), body = document.getElementById('summaryBody');
+            head.innerHTML = `<tr><th>序號</th>${useT1 ? '<th>T1</th>' : ''}${useT2 ? '<th>T2</th>' : ''}${useC ? '<th>C</th>' : ''}</tr>`;
+            body.innerHTML = '';
+            strips.forEach((s, idx) => {
+                const ctx = s.canvas.getContext('2d'), data = ctx.getImageData(0, 0, s.canvas.width, s.canvas.height).data, w = s.canvas.width, h = s.canvas.height;
+                const profile = [];
+                for (let x = 0; x < w; x++) {
+                    let sum = 0, count = 0;
+                    for (let y = Math.floor(h * 0.2); y < Math.floor(h * 0.8); y++) {
+                        sum += 0.299 * data[(y * w + x) * 4] + 0.587 * data[(y * w + x) * 4 + 1] + 0.114 * data[(y * w + x) * 4 + 2];
+                        count++;
+                    }
+                    profile.push(sum / count);
+                }
+                let rowHtml = `<tr><td>${s.id}</td>`;
+                s.rois.forEach((roi, rIdx) => {
+                    if ((rIdx === 0 && !useT1) || (rIdx === 1 && !useT2) || (rIdx === 2 && !useC)) return;
+                    const sX = Math.floor(roi.x * w), eX = Math.floor((roi.x + roi.w) * w);
+                    const roiP = profile.slice(sX, eX), mv = Math.min(...roiP), pi = roiP.indexOf(mv);
+                    let ps = 0, pc = 0; for (let i = pi - 2; i <= pi + 2; i++) if (roiP[i] !== undefined) { ps += roiP[i]; pc++; }
+                    const peak = ps / pc;
+                    let bg = 0; const LF = 20, sp = 10;
+                    if (roi.label === 'T1') bg = getMean(profile, Math.max(0, sX - LF - sp), Math.max(0, sX - sp));
+                    else if (roi.label === 'C') bg = getMean(profile, Math.min(w, eX + sp), Math.min(w, eX + sp + LF));
+                    else bg = (getMean(profile, Math.max(0, sX - LF - sp), Math.max(0, sX - sp)) + getMean(profile, Math.min(w, eX + sp), Math.min(w, eX + sp + LF))) / 2;
+                    let density = Math.max(0, Math.round(bg - peak));
+                    if (density < 3.0) density = 0;
+                    roi.val = density;
+                    document.getElementById(`val-${idx}-${roi.label}`).innerText = roi.val;
+                    rowHtml += `<td style="color:${roi.color}">${roi.val}</td>`;
+                });
+                body.innerHTML += rowHtml + `</tr>`;
+            });
+            summarySection.classList.remove('hidden');
+            analysisRun = true;
+        }
+
+        function getMean(arr, s, e) { if (s >= e) return 255; const sl = arr.slice(s, e); return sl.reduce((a, b) => a + b, 0) / sl.length; }
+        function exportExcel() { if (!analysisRun) return; XLSX.writeFile(XLSX.utils.table_to_book(document.getElementById('summaryTable')), `Density_Report.xlsx`); }
+        function exportPPT() {
+            if (!analysisRun) return;
+            let pres = new PptxGenJS(); let slide = pres.addSlide();
+            const useT1 = document.getElementById('checkT1').checked, useT2 = document.getElementById('checkT2').checked, useC = document.getElementById('checkC').checked;
+            let xOff = 0.5, yOff = 0.5, rowH = 0.45;
+            strips.forEach((s, idx) => {
+                if (yOff > 5.0) { if (xOff > 5.0) { slide = pres.addSlide(); xOff = 0.5; yOff = 0.5; } else { xOff = 5.2; yOff = 0.5; } }
+                slide.addImage({ data: s.canvas.toDataURL(), x: xOff, y: yOff, w: 2.2, h: 0.35 });
+                let txt = `#${s.id} | ${useT1 ? 'T1:' + s.rois[0].val : ''} ${useT2 ? 'T2:' + s.rois[1].val : ''} ${useC ? 'C:' + s.rois[2].val : ''}`;
+                slide.addText(txt, { x: xOff + 2.3, y: yOff, fontSize: 10, color: "363636", bold: true });
+                yOff += rowH;
+            });
+            pres.writeFile({ fileName: "Analysis_Report.pptx" });
+        }
+        function loadImage(url) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = url; }); }
+    </script>
+</body>
+
+</html>
